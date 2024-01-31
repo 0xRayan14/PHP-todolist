@@ -1,10 +1,7 @@
 <?php
-$path = 'data.json';
-$allTodos = file_exists($path) ? json_decode(file_get_contents($path), true) : [];
-
 session_start();
 
-$dsn = "sqlite: myDB.db";
+$dsn = "sqlite:myDB.db";
 
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -14,16 +11,31 @@ $options = [
 
 $pdo = new PDO($dsn, null, null, $options);
 
+$pdo->exec("CREATE TABLE IF NOT EXISTS todo (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                todo TEXT NOT NULL,
+                position INTEGER NOT NULL
+            )");
+
+$query = $pdo->prepare("SELECT * FROM todo ORDER BY id ASC");
+$query->execute();
+$allTodos = $query->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
     if (isset($_POST['todo'])) {
         $newTodo = htmlspecialchars($_POST['todo']);
         if (mb_strlen($newTodo) < 3) {
             $_SESSION['errors'] = "Votre todo est trop courte";
         } else {
-            $allTodos[] = ['id' => count($allTodos) + 1, 'todo' => $newTodo];
-            file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
+            $stmt = $pdo->prepare("SELECT MAX(position) FROM todo");
+            $stmt->execute();
+            $maxPosition = $stmt->fetchColumn();
+
+            $position = $maxPosition + 1;
+
+            $stmt = $pdo->prepare("INSERT INTO todo (todo, position) VALUES (?, ?)");
+            $stmt->execute([$newTodo, $position]);
+
             $_SESSION['validate'] = "Votre todo est validée";
         }
         header('Location: index.php');
@@ -32,70 +44,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($_POST['delete'])) {
         $deleteId = $_POST['delete'];
-        $allTodos = array_values(array_filter($allTodos, function($todo) use ($deleteId) {
-            return $todo['id'] != $deleteId;
-        }));
-        file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
+        $stmt = $pdo->prepare("DELETE FROM todo WHERE id = ?");
+        $stmt->execute([$deleteId]);
         header('Location: index.php');
         exit();
     }
 
     if (isset($_POST['edit'])) {
         $editId = $_POST['edit'];
-        $editedTodo = null;
-        foreach ($allTodos as $todo) {
-            if ($todo['id'] == $editId) {
-                $editedTodo = $todo;
-                $_SESSION['validateModification'] = "Votre todo est modifiée";
-                break;
-            }
-        }
+        $stmt = $pdo->prepare("SELECT * FROM todo WHERE id = ?");
+        $stmt->execute([$editId]);
+        $editedTodo = $stmt->fetch();
+        $_SESSION['validateModification'] = "Votre todo est modifiée";
     }
 
     if (isset($_POST['edited_id'])) {
         $editedId = $_POST['edited_id'];
         $updatedTodo = htmlspecialchars($_POST['updated_todo']);
-        foreach ($allTodos as &$todo) {
-            if ($todo['id'] == $editedId) {
-                $todo['todo'] = $updatedTodo;
-                break;
-            }
-        }
-        file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
+        $stmt = $pdo->prepare("UPDATE todo SET todo = ? WHERE id = ?");
+        $stmt->execute([$updatedTodo, $editedId]);
         header('Location: index.php');
         exit();
     }
 
     if (isset($_POST['up'])) {
         $selectedId = $_POST['up'];
-        $position = array_search($selectedId, array_column($allTodos, 'id'));
-        if ($position > 0) {
-            $temp = $allTodos[$position];
-            $allTodos[$position] = $allTodos[$position - 1];
-            $allTodos[$position - 1] = $temp;
-            file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
+
+        // Get the position of the selected todo
+        $stmt = $pdo->prepare("SELECT position FROM todo WHERE id = ?");
+        $stmt->execute([$selectedId]);
+        $currentPosition = $stmt->fetchColumn();
+
+        if ($currentPosition > 1) {
+            $stmt = $pdo->prepare("SELECT id, position FROM todo WHERE position = ?");
+            $stmt->execute([$currentPosition - 1]);
+
+            // Check if the query returned a result
+            if ($aboveTodo = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                // Swap positions
+                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
+                $stmt->execute([$currentPosition - 1, $selectedId]);
+                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
+                $stmt->execute([$currentPosition, $aboveTodo['id']]);
+
+                header('Location: index.php');
+                exit();
+            }
         }
-        header('Location: index.php');
-        exit();
     }
 
     if (isset($_POST['down'])) {
         $selectedId = $_POST['down'];
-        $position = array_search($selectedId, array_column($allTodos, 'id'));
-        if ($position < count($allTodos) - 1) {
-            $temp = $allTodos[$position];
-            $allTodos[$position] = $allTodos[$position + 1];
-            $allTodos[$position + 1] = $temp;
-            file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
+
+        $stmt = $pdo->prepare("SELECT position FROM todo WHERE id = ?");
+        $stmt->execute([$selectedId]);
+        $currentPosition = $stmt->fetchColumn();
+
+        if ($currentPosition < $maxPosition) {
+            $stmt = $pdo->prepare("SELECT id, position FROM todo WHERE position = ?");
+            $stmt->execute([$currentPosition + 1]);
+
+            if ($belowTodo = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                // Swap positions
+                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
+                $stmt->execute([$currentPosition + 1, $selectedId]);
+                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
+                $stmt->execute([$currentPosition, $belowTodo['id']]);
+
+                header('Location: index.php');
+                exit();
+            }
         }
-        header('Location: index.php');
-        exit();
     }
 
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
-    // Si une recherche est effectuée
-        if ($_GET['search'] && !empty($_GET['search'])) {
+
+
+
+} elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+
+    if (isset($_GET['search'])) {
             $searchTerm = htmlspecialchars($_GET['search']);
             $allTodos = array_filter($allTodos, function ($todo) use ($searchTerm) {
             return stripos($todo['todo'], $searchTerm) !== false;
@@ -103,13 +131,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Trie les tâches par lettres alphabétiques
-        if ($_GET['sort_AZ']) {
+    if (isset($_GET['sort_AZ'])) {
             usort($allTodos, function ($a, $b) {
                 return strcmp($a['todo'], $b['todo']);
             });
         }
 
-        if ($_GET['sort_ZA']) {
+        if (isset($_GET['sort_ZA'])) {
             usort($allTodos, function ($a, $b) {
                 return strcmp($b['todo'], $a['todo']);
             });
@@ -159,12 +187,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <form action="index.php" method="post" class="inline-form">
                     <input type="hidden" name="edit" value="<?= $todo['id'] ?>">
-                    <input type="submit" value="Modifier">
+                    <input type="submit" value="Edit">
                 </form>
 
                 <form action="index.php" method="post" class="inline-form">
                     <input type="hidden" name="delete" value="<?= $todo['id'] ?>">
-                    <input type="submit" value="Supprimer">
+                    <input type="submit" value="Delete">
                 </form>
 
                 <form action="index.php" method="post" class="inline-form">
