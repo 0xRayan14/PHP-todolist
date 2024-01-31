@@ -1,0 +1,83 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+form {
+    margin-bottom: 20px;
+}
+
+form label {
+    display: block;
+    margin-bottom: 10px;
+}
+
+input[type="text"] {
+    padding: 8px;
+}
+
+input[type="submit"] {
+    padding: 8px 15px;
+    background-color: #4CAF50;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+input[type="submit"]:hover {
+    background-color: #45a049;
+}
+
+h2 {
+    color: #333;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+li {
+    background-color: #fff;
+    margin: 10px 0;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+li form {
+    margin-left: 10px;
+}
+
+li form input[type="submit"] {
+    background-color: #d9534f;
+}
+
+li form input[type="submit"]:hover {
+    background-color: #c9302c;
+}
+
+form[action="index.php"] {
+    display: flex;
+    justify-content: space-between;
+}
+
+form[action="index.php"] label {
+    flex: 1;
+}
+
+form[action="index.php"] input[type="submit"] {
+    flex: 0;
+    margin-left: 10px;
+}
+
+form[action="index.php"] input[type="text"] {
+    flex: 1;
+}
+
+form[action="index.php"] input[type="submit"]:last-child {
+    margin-left: 0;
+}
+
