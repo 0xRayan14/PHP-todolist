@@ -6,13 +6,14 @@ session_start();
 
 $dsn = "sqlite: myDB.db";
 
-
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES => false,
 ];
+
 $pdo = new PDO($dsn, null, null, $options);
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['todo'])) {
@@ -21,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['errors'] = "Votre todo est trop courte";
         } else {
             $allTodos[] = ['id' => count($allTodos) + 1, 'todo' => $newTodo];
-            file_put_contents($path, json_encode($allTodos, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
+            file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
             $_SESSION['validate'] = "Votre todo est validée";
         }
         header('Location: index.php');
@@ -64,14 +65,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
+    if (isset($_POST['up'])) {
+        $selectedId = $_POST['up'];
+        $position = array_search($selectedId, array_column($allTodos, 'id'));
+        if ($position > 0) {
+            $temp = $allTodos[$position];
+            $allTodos[$position] = $allTodos[$position - 1];
+            $allTodos[$position - 1] = $temp;
+            file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
+        }
+        header('Location: index.php');
+        exit();
+    }
+
+    if (isset($_POST['down'])) {
+        $selectedId = $_POST['down'];
+        $position = array_search($selectedId, array_column($allTodos, 'id'));
+        if ($position < count($allTodos) - 1) {
+            $temp = $allTodos[$position];
+            $allTodos[$position] = $allTodos[$position + 1];
+            $allTodos[$position + 1] = $temp;
+            file_put_contents($path, json_encode($allTodos, JSON_PRETTY_PRINT));
+        }
+        header('Location: index.php');
+        exit();
+    }
+
     // Trie les tâches par lettres alphabétiques
-    if (isset($_POST['sort_AZ'])) {
+    if ($_GET['sort_AZ']) {
         usort($allTodos, function ($a, $b) {
             return strcmp($a['todo'], $b['todo']);
         });
     }
 
-    if (isset($_POST['sort_ZA'])) {
+    if ($_GET['sort_ZA']) {
         usort($allTodos, function ($a, $b) {
             return strcmp($b['todo'], $a['todo']);
         });
@@ -90,15 +117,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 
 <form action="index.php" method="post">
-    <label>
+    <label for="todoInput">
         Ajouter une todo:
-        <input type="text" name="todo">
+        <input type="text" id="todoInput" name="todo">
     </label>
     <input type="submit" value="Ajouter">
+    <?php if (isset($_SESSION['validate'])): ?>
+        <p style="color: green" class="success-message"><?= $_SESSION['validate']?></p>
+        <?php unset($_SESSION['validate']); ?>
+    <?php endif; ?>
+    <?php if (isset($_SESSION['errors'])): ?>
+        <p style="color: red" class="error-message"><?= $_SESSION['errors']?></p>
+        <?php unset($_SESSION['errors']); ?>
+    <?php endif; ?>
 </form>
 
 <h2>Toutes les todo's :</h2>
-<form action="index.php" method="post">
+<form action="index.php" method="get">
     <label>
         Trier todos
     </label>
