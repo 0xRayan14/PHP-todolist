@@ -16,6 +16,7 @@ $pdo = new PDO($dsn, null, null, $options);
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     if (isset($_POST['todo'])) {
         $newTodo = htmlspecialchars($_POST['todo']);
         if (mb_strlen($newTodo) < 3) {
@@ -91,23 +92,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+
+    // Si une recherche est effectuée
+        if ($_GET['search'] && !empty($_GET['search'])) {
+            $searchTerm = htmlspecialchars($_GET['search']);
+            $allTodos = array_filter($allTodos, function ($todo) use ($searchTerm) {
+            return stripos($todo['todo'], $searchTerm) !== false;
+            });
+    }
+
     // Trie les tâches par lettres alphabétiques
-    if ($_GET['sort_AZ']) {
-        usort($allTodos, function ($a, $b) {
-            return strcmp($a['todo'], $b['todo']);
-        });
-    }
+        if ($_GET['sort_AZ']) {
+            usort($allTodos, function ($a, $b) {
+                return strcmp($a['todo'], $b['todo']);
+            });
+        }
 
-    if ($_GET['sort_ZA']) {
-        usort($allTodos, function ($a, $b) {
-            return strcmp($b['todo'], $a['todo']);
-        });
-    }
-
+        if ($_GET['sort_ZA']) {
+            usort($allTodos, function ($a, $b) {
+                return strcmp($b['todo'], $a['todo']);
+            });
+        }
 }
 ?>
 
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -116,66 +126,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 
-<form action="index.php" method="post">
-    <label for="todoInput">
-        Ajouter une todo:
+<div class="container">
+    <form action="index.php" method="post" class="todo-form">
+        <label for="todoInput">Ajouter une todo:</label>
         <input type="text" id="todoInput" name="todo">
-    </label>
-    <input type="submit" value="Ajouter">
-    <?php if (isset($_SESSION['validate'])): ?>
-        <p style="color: green" class="success-message"><?= $_SESSION['validate']?></p>
-        <?php unset($_SESSION['validate']); ?>
-    <?php endif; ?>
-    <?php if (isset($_SESSION['errors'])): ?>
-        <p style="color: red" class="error-message"><?= $_SESSION['errors']?></p>
-        <?php unset($_SESSION['errors']); ?>
-    <?php endif; ?>
-</form>
-
-<h2>Toutes les todo's :</h2>
-<form action="index.php" method="get">
-    <label>
-        Trier todos
-    </label>
-    <input type="submit" value="A-Z" name="sort_AZ">
-    <input type="submit" value="Z-A" name="sort_ZA">
-</form>
-<ul>
-    <?php foreach ($allTodos as $position => $todo): ?>
-        <li>
-            <?= htmlspecialchars($position + 1) ?> - <?= htmlspecialchars($todo['todo']) ?>
-
-            <form action="index.php" method="post" style="display: inline;">
-                <input type="hidden" name="edit" value="<?= $todo['id'] ?>">
-                <input type="submit" value="Modifier">
-            </form>
-
-            <form action="index.php" method="post" style="display: inline;">
-                <input type="hidden" name="delete" value="<?= $todo['id'] ?>">
-                <input type="submit" value="Supprimer">
-            </form>
-            <form action="index.php" method="post" style="display: inline;">
-                <input type="hidden" name="up" value="<?= $todo['id'] ?>">
-                <input type="submit" value="up">
-            </form>
-            <form action="index.php" method="post" style="display: inline;">
-                <input type="hidden" name="down" value="<?= $todo['id'] ?>">
-                <input type="submit" value="down">
-            </form>
-        </li>
-    <?php endforeach; ?>
-</ul>
-
-<?php if (isset($editedTodo)): ?>
-    <form action="index.php" method="post">
-        <input type="hidden" name="edited_id" value="<?= $editedTodo['id'] ?>">
-        <label>
-            Modifier la todo:
-            <input type="text" name="updated_todo" value="<?= htmlspecialchars($editedTodo['todo']) ?>">
-        </label>
-        <input type="submit" name="update" value="Mettre à jour">
+        <input type="submit" value="Ajouter">
+        <?php if (isset($_SESSION['validate'])): ?>
+            <p class="success-message"><?= $_SESSION['validate']?></p>
+            <?php unset($_SESSION['validate']); ?>
+        <?php endif; ?>
+        <?php if (isset($_SESSION['errors'])): ?>
+            <p class="error-message"><?= $_SESSION['errors']?></p>
+            <?php unset($_SESSION['errors']); ?>
+        <?php endif; ?>
     </form>
-<?php endif; ?>
+
+    <form action="index.php" method="get" class="search-form">
+        <label for="search">Rechercher une todo:</label>
+        <input type="text" name="search" id="search" value="<?= isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '' ?>">
+        <input type="submit" value="Rechercher">
+        <label>Trier todos</label>
+        <input type="submit" value="A-Z" name="sort_AZ">
+        <input type="submit" value="Z-A" name="sort_ZA">
+    </form>
+    <h2>Toutes les todo's :</h2>
+
+
+    <ul class="todo-list">
+        <?php foreach ($allTodos as $position => $todo): ?>
+            <li>
+                <?= htmlspecialchars($position + 1) ?> - <?= htmlspecialchars($todo['todo']) ?>
+
+                <form action="index.php" method="post" class="inline-form">
+                    <input type="hidden" name="edit" value="<?= $todo['id'] ?>">
+                    <input type="submit" value="Modifier">
+                </form>
+
+                <form action="index.php" method="post" class="inline-form">
+                    <input type="hidden" name="delete" value="<?= $todo['id'] ?>">
+                    <input type="submit" value="Supprimer">
+                </form>
+
+                <form action="index.php" method="post" class="inline-form">
+                    <input type="hidden" name="up" value="<?= $todo['id'] ?>">
+                    <input type="submit" value="up">
+                </form>
+
+                <form action="index.php" method="post" class="inline-form">
+                    <input type="hidden" name="down" value="<?= $todo['id'] ?>">
+                    <input type="submit" value="down">
+                </form>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+
+    <?php if (isset($editedTodo)): ?>
+        <form action="index.php" method="post" class="edit-form">
+            <input type="hidden" name="edited_id" value="<?= $editedTodo['id'] ?>">
+            <label for="updated_todo">Modifier la todo:</label>
+            <input type="text" name="updated_todo" id="updated_todo" value="<?= htmlspecialchars($editedTodo['todo']) ?>">
+            <input type="submit" name="update" value="Mettre à jour">
+        </form>
+    <?php endif; ?>
+</div>
 
 </body>
 </html>
