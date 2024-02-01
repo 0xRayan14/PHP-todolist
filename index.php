@@ -68,7 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: index.php');
         exit();
     }
-
     if (isset($_POST['up'])) {
         $selectedId = $_POST['up'];
 
@@ -88,6 +87,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$currentPosition - 1, $selectedId]);
                 $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
                 $stmt->execute([$currentPosition, $aboveTodo['id']]);
+
+                header('Location: index.php');
+                exit();
+            }
+        }
+    }
+
+    if (isset($_POST['down'])) {
+        $selectedId = $_POST['down'];
+
+        // Get the position of the selected todo
+        $stmt = $pdo->prepare("SELECT position FROM todo WHERE id = ?");
+        $stmt->execute([$selectedId]);
+        $currentPosition = $stmt->fetchColumn();
+
+        // Get the maximum position in the list
+        $stmt = $pdo->query("SELECT MAX(position) FROM todo");
+        $maxPosition = $stmt->fetchColumn();
+
+        if ($currentPosition < $maxPosition) {
+            $stmt = $pdo->prepare("SELECT id, position FROM todo WHERE position = ?");
+            $stmt->execute([$currentPosition + 1]);
+
+            // Check if the query returned a result
+            if ($belowTodo = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                // Swap positions
+                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
+                $stmt->execute([$currentPosition + 1, $selectedId]);
+                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
+                $stmt->execute([$currentPosition, $belowTodo['id']]);
 
                 header('Location: index.php');
                 exit();
@@ -160,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <ul class="todo-list">
         <?php foreach ($allTodos as $position => $todo): ?>
             <li>
-                <?= htmlspecialchars($dateTime, $position + 1) ?> - <?=($todo['todo'])?>
+                <?= htmlspecialchars( $position + 1) ?> - <?=($todo['todo'])?>
 
                 <form action="index.php" method="post" class="inline-form">
                     <input type="hidden" name="edit" value="<?= $todo['id'] ?>">
