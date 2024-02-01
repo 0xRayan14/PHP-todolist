@@ -1,4 +1,6 @@
 <?php
+
+
 session_start();
 
 $dsn = "sqlite:myDB.db";
@@ -14,12 +16,13 @@ $pdo = new PDO($dsn, null, null, $options);
 $pdo->exec("CREATE TABLE IF NOT EXISTS todo (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 todo TEXT NOT NULL,
-                position INTEGER NOT NULL
+                position INTEGER NOT NULL,
+                date INTEGER NOT NULL
             )");
 
-$query = $pdo->prepare("SELECT * FROM todo ORDER BY id ASC");
-$query->execute();
+$query = $pdo->query("SELECT * FROM todo ORDER BY id ASC");
 $allTodos = $query->fetchAll();
+$dateTime = date("m-d\\:i:s");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['todo'])) {
@@ -27,8 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (mb_strlen($newTodo) < 3) {
             $_SESSION['errors'] = "Votre todo est trop courte";
         } else {
-            $stmt = $pdo->prepare("SELECT MAX(position) FROM todo");
-            $stmt->execute();
+            $stmt = $pdo->query("SELECT MAX(position) FROM todo");
             $maxPosition = $stmt->fetchColumn();
 
             $position = $maxPosition + 1;
@@ -93,31 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if (isset($_POST['down'])) {
-        $selectedId = $_POST['down'];
-
-        $stmt = $pdo->prepare("SELECT position FROM todo WHERE id = ?");
-        $stmt->execute([$selectedId]);
-        $currentPosition = $stmt->fetchColumn();
-
-        if ($currentPosition < $maxPosition) {
-            $stmt = $pdo->prepare("SELECT id, position FROM todo WHERE position = ?");
-            $stmt->execute([$currentPosition + 1]);
-
-            if ($belowTodo = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                // Swap positions
-                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
-                $stmt->execute([$currentPosition + 1, $selectedId]);
-                $stmt = $pdo->prepare("UPDATE todo SET position = ? WHERE id = ?");
-                $stmt->execute([$currentPosition, $belowTodo['id']]);
-
-                header('Location: index.php');
-                exit();
-            }
-        }
-    }
-
-
 
 
 
@@ -125,14 +102,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($_GET['search'])) {
             $searchTerm = htmlspecialchars($_GET['search']);
-            $allTodos = array_filter($allTodos, function ($todo) use ($searchTerm) {
+            $allTodos = array_filter($allTodos, static function ($todo) use ($searchTerm) {
             return stripos($todo['todo'], $searchTerm) !== false;
             });
     }
 
     // Trie les tâches par lettres alphabétiques
     if (isset($_GET['sort_AZ'])) {
-            usort($allTodos, function ($a, $b) {
+            usort($allTodos, static function ($a, $b) {
                 return strcmp($a['todo'], $b['todo']);
             });
         }
@@ -183,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <ul class="todo-list">
         <?php foreach ($allTodos as $position => $todo): ?>
             <li>
-                <?= htmlspecialchars($position + 1) ?> - <?= htmlspecialchars($todo['todo']) ?>
+                <?= htmlspecialchars($dateTime, $position + 1) ?> - <?=($todo['todo'])?>
 
                 <form action="index.php" method="post" class="inline-form">
                     <input type="hidden" name="edit" value="<?= $todo['id'] ?>">
